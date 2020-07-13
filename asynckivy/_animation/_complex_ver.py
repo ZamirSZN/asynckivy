@@ -17,6 +17,11 @@ async def animate(target, **kwargs):
         transition = getattr(AnimationTransition, transition)
     animated_properties = kwargs
 
+    if not duration:
+        for key, value in animated_properties.items():
+            setattr(target, key, value)
+        return
+
     # get current values
     properties = {}
     for key, value in animated_properties.items():
@@ -26,11 +31,6 @@ async def animate(target, **kwargs):
         elif isinstance(original_value, dict):
             original_value = original_value.copy()
         properties[key] = (original_value, value)
-
-    if not duration:
-        await sleep(0)
-        _set_final_value(target, properties)
-        return
 
     try:
         ctx = {
