@@ -1,38 +1,43 @@
 __all__ = ('rest_of_touch_moves', )
 
-import types
+from asynckivy._core_utils import get_my_own_agen
 
 
-async def rest_of_touch_moves(widget, touch, *, eat_touch=False):
+@get_my_own_agen
+async def rest_of_touch_moves(widget, touch, *, eat_touch=False, get_my_own_agen):
     '''Returns an async-generator, which yields the touch when `on_touch_move`
     is fired, and ends when `on_touch_up` is fired. Grabs and ungrabs the
     touch automatically. If `eat_touch` is True, the touch will never be
     dispatched further.
     '''
-    from asynckivy._core import _get_step_coro
+    import asynckivy as ak
+    from asynckivy._core import _get_step_coro, sleep_forever
     step_coro = await _get_step_coro()
+    my_own_agen = get_my_own_agen()
 
     if eat_touch:
         def _on_touch_up(w, t):
             if t is touch:
                 if t.grab_current is w:
                     t.ungrab(w)
-                    step_coro(False)
+                    ak.start(my_own_agen.aclose())
+                    step_coro()
                 return True
         def _on_touch_move(w, t):
             if t is touch:
                 if t.grab_current is w:
-                    step_coro(True)
+                    step_coro()
                 return True
     else:
         def _on_touch_up(w, t):
             if t.grab_current is w and t is touch:
                 t.ungrab(w)
-                step_coro(False)
+                ak.start(my_own_agen.aclose())
+                step_coro()
                 return True
         def _on_touch_move(w, t):
             if t.grab_current is w and t is touch:
-                step_coro(True)
+                step_coro()
                 return True
 
     touch.grab(widget)
@@ -41,22 +46,14 @@ async def rest_of_touch_moves(widget, touch, *, eat_touch=False):
     assert uid_up
     assert uid_move
 
-    # assigning to a local variable might improve performance
-    true_if_touch_move_false_if_touch_up = \
-        _true_if_touch_move_false_if_touch_up
-
     try:
-        while await true_if_touch_move_false_if_touch_up():
+        while True:
+            await sleep_forever()
             yield touch
     finally:
         touch.ungrab(widget)
         widget.unbind_uid('on_touch_up', uid_up)
         widget.unbind_uid('on_touch_move', uid_move)
-
-
-@types.coroutine
-def _true_if_touch_move_false_if_touch_up() -> bool:
-    return (yield lambda step_coro: None)[0][0]
 
 
 all_touch_moves = rest_of_touch_moves  # will be removed in the future
